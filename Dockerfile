@@ -12,6 +12,6 @@ WORKDIR /pikaraoke
 RUN python3 -m venv .venv
 RUN . /pikaraoke/.venv/bin/activate && pip install -r requirements.txt
 
-ENTRYPOINT  /pikaraoke/pikaraoke.sh  
+ENTRYPOINT  ["/pikaraoke/pikaraoke.sh"]  
 
 
