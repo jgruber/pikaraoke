@@ -390,9 +390,7 @@ class Karaoke:
         default_vcodec = "h264_v4l2m2m" if self.platform == "raspberry_pi" else "libx264" 
         # just copy the video stream if it's an mp4 or webm file, since they are supported natively in html5 
         # otherwise use the default h264 codec
-        #vcodec = "copy" if fr.file_extension == ".mp4" or fr.file_extension == ".webm" else default_vcodec
-        
-        vcodec = default_vcodec
+        vcodec = "copy" if fr.file_extension == ".mp4" or fr.file_extension == ".webm" else default_vcodec
         vbitrate = "5M" #seems to yield best results w/ h264_v4l2m2m on pi, recommended for 720p.
 
         # copy the audio stream if no transposition, otherwise use the aac codec
