@@ -717,13 +717,6 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
-        "-s",
-        "--library-path",
-        help="Desired path for library of songs. (default: %s)" % default_lib_dir,
-        default=default_lib_dir,
-        required=False,
-    )
-    parser.add_argument(
         "-r",
         "--library-path",
         help=f"Desired path for the library of songs. (default: {default_library_path})" ,
