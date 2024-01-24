@@ -396,7 +396,7 @@ class Karaoke:
         # copy the audio stream if no transposition, otherwise use the aac codec
         is_transposed = semitones != 0
         acodec = "aac" if is_transposed else "copy"
-        input = ffmpeg.input(f"\"{fr.file_path}\"")
+        input = ffmpeg.input(fr.file_path.replace(' ','\ '))
         audio = input.audio.filter("rubberband", pitch=pitch) if is_transposed else input.audio
 
         if (fr.cdg_file_path != None): #handle CDG files
