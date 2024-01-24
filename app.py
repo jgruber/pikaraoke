@@ -695,7 +695,6 @@ if __name__ == "__main__":
     platform = get_platform()
     default_port = 5555
     default_ffmpeg_port = 5556
-    default_library_path = '/media/karaoke'
     default_volume = 0.85
     default_splash_delay = 3
     default_screensaver_delay = 300
@@ -717,13 +716,6 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
-        "-r",
-        "--library-path",
-        help=f"Desired path for the library of songs. (default: {default_library_path})" ,
-        default=default_library_path,
-        required=False,
-    )
-    parser.add_argument(
         "-f",
         "--ffmpeg-port",
         help=f"Desired ffmpeg port. This is where video stream URLs will be pointed (default: {default_ffmpeg_port})" ,
@@ -731,10 +723,17 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
+        "-r",
+        "--library-path",
+        help=f"Desired path for the library of songs. (default: {default_lib_dir})" ,
+        default=default_lib_dir,
+        required=False,
+    )
+    parser.add_argument(
         "-d",
         "--download-path",
         nargs='+',
-        help="Desired path for downloaded songs. (default: %s)" % default_dl_dir,
+        help=f"Desired path for downloaded songs. (default: {default_dl_dir})",
         default=default_dl_dir,
         required=False,
     )
@@ -742,30 +741,28 @@ if __name__ == "__main__":
         "-y",
         "--youtubedl-path",
         nargs='+',
-        help="Path of youtube-dl. (default: %s)" % default_youtubedl_path,
+        help=f"Path of youtube-dl. (default: {default_youtubedl_path})",
         default=default_youtubedl_path,
         required=False,
     )
     parser.add_argument(
         "-v",
         "--volume",
-        help="Set initial player volume. A value between 0 and 1. (default: %s)" % default_volume,
+        help=f"Set initial player volume. A value between 0 and 1. (default: {default_volume})",
         default=default_volume,
         required=False,
     )
     parser.add_argument(
         "-s",
         "--splash-delay",
-        help="Delay during splash screen between songs (in secs). (default: %s )"
-        % default_splash_delay,
+        help=f"Delay during splash screen between songs (in secs). (default: {default_splash_delay})",
         default=default_splash_delay,
         required=False,
     )
     parser.add_argument(
         "-t",
         "--screensaver-timeout",
-        help="Delay before the screensaver begins (in secs). (default: %s )"
-        % default_screensaver_delay,
+        help=f"Delay before the screensaver begins (in secs). (default: {default_screensaver_delay})",
         default=default_screensaver_delay,
         required=False,
     )
