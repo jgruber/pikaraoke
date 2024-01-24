@@ -34,6 +34,8 @@ try:
 except ImportError:
     from urllib import quote, unquote
 
+from pathlib import Path, PurePath
+
 _ = flask_babel.gettext
 
 
@@ -57,11 +59,35 @@ def filename_from_path(file_path, remove_youtube_id=True):
             rc = rc.split("---".encode("utf-8", "ignore"))[0]
     return rc
 
+def filename_and_collection_from_path(file_path):
+    path = PurePath(file_path)
+    rc = path.stem.split("---")[0]  # removes youtube id if present
+    collection = path.parent.name
+    song_type = "video"
+    if path.suffix == '.mp3':
+        song_type = 'cdg'
+    return "%s - %s - %s" % (rc, collection, song_type)
+
+def is_path_in_path(dir_path, sub_path):
+    child = Path(sub_path)
+    for p in child.parents:
+        if str(p) == str(dir_path):
+            return True
+    return False
+
+
 def arg_path_parse(path):
     if (type(path) == list):
         return " ".join(path)
     else:
         return path
+
+def is_path_in_path(dir_path, sub_path):
+    child = Path(sub_path)
+    for p in child.parents:
+        if str(p) == str(dir_path):
+            return True
+    return False
 
 def url_escape(filename):
     return quote(filename.encode("utf8"))
@@ -287,12 +313,14 @@ def search():
 @app.route("/autocomplete")
 def autocomplete():
     q = request.args.get('q').lower()
-    result = []
+    result = {}
     for each in k.available_songs:
         if q in each.lower():
-            result.append({"path": each, "fileName": k.filename_from_path(each), "type": "autocomplete"})
+            # result.append({"path": each, "fileName": k.filename_from_path(each), "type": "autocomplete"})
+            file_and_collection = k.filename_and_collection_from_path(each)
+            result["".join(file_and_collection.lower().split())] = {"path": each, "fileName": file_and_collection, "type": "autocomplete"}
     response = app.response_class(
-        response=json.dumps(result),
+        response=json.dumps(list(result.values())),
         mimetype='application/json'
     )
     return response
@@ -409,7 +437,10 @@ def delete_file():
             flash("Song deleted: " + song_path, "is-warning")
     else:
         flash("Error: No song parameter specified!", "is-danger")
-    return redirect(url_for("browse"))
+    if "redirect" in request.args:
+        return redirect(url_for(request.args["redirect"]))
+    else:
+        return redirect(url_for("browse"))
 
 
 @app.route("/files/edit", methods=["GET", "POST"])
@@ -422,11 +453,15 @@ def edit_file():
             flash(queue_error_msg + song_path, "is-danger")
             return redirect(url_for("browse"))
         else:
+            redirect_page = "browse"
+            if "redirect" in request.args:
+                redirect_page = request.args["redirect"]
             return render_template(
                 "edit.html",
                 site_title=site_name,
                 title="Song File Edit",
                 song=song_path.encode("utf-8", "ignore"),
+                redirect_page=redirect_page
             )
     else:
         d = request.form.to_dict()
@@ -438,10 +473,10 @@ def edit_file():
                 flash(queue_error_msg + song_path, "is-danger")
             else:
                 # check if new_name already exist
+                file_path = os.path.dirname(old_name)
                 file_extension = os.path.splitext(old_name)[1]
-                if os.path.isfile(
-                    os.path.join(k.download_path, new_name + file_extension)
-                ):
+                new_name = os.path.join(file_path, new_name + file_extension)
+                if os.path.isfile(new_name):
                     flash(
                         "Error Renaming file: '%s' to '%s'. Filename already exists."
                         % (old_name, new_name + file_extension),
@@ -455,7 +490,10 @@ def edit_file():
                     )
         else:
             flash("Error: No filename parameters were specified!", "is-danger")
-        return redirect(url_for("browse"))
+        if "redirect" in request.args:
+            return redirect(url_for(request.args["redirect"]))
+        else:
+            return redirect(url_for("browse"))
 
 @app.route("/splash")
 def splash():
@@ -618,9 +656,9 @@ def get_default_youtube_dl_path(platform):
     return os.path.join(os.path.dirname(__file__), ".venv/bin/yt-dlp")
         
 
-def get_default_dl_dir(platform):
-    if is_raspberry_pi:
-        return "~/pikaraoke-songs"
+def get_default_lib_dir(platform):
+    if platform == "raspberry_pi":
+        return "/usr/lib/pikaraoke/songs"
     elif platform == "windows":
         legacy_directory = os.path.expanduser("~\pikaraoke\songs")
         if os.path.exists(legacy_directory):
@@ -635,17 +673,36 @@ def get_default_dl_dir(platform):
             return "~/pikaraoke-songs"
 
 
+def get_default_dl_dir(platform):
+    if platform == "raspberry_pi":
+        return "/usr/lib/pikaraoke/songs/downloads"
+    elif platform == "windows":
+        legacy_directory = os.path.expanduser("~\pikaraoke\songs\downloads")
+        if os.path.exists(legacy_directory):
+            return legacy_directory
+        else:
+            return "~\pikaraoke-songs\downloads"
+    else:
+        legacy_directory = "~/pikaraoke/songs/downloads"
+        if os.path.exists(legacy_directory):
+            return legacy_directory
+        else:
+            return "~/pikaraoke-songs/downloads"
+
+
 if __name__ == "__main__":
 
     platform = get_platform()
     default_port = 5555
     default_ffmpeg_port = 5556
+    default_library_path = '/media/karaoke'
     default_volume = 0.85
     default_splash_delay = 3
     default_screensaver_delay = 300
     default_log_level = logging.INFO
     default_prefer_hostname = False
 
+    default_lib_dir = get_default_lib_dir(platform)
     default_dl_dir = get_default_dl_dir(platform)
     default_youtubedl_path = get_default_youtube_dl_path(platform)
 
@@ -657,6 +714,20 @@ if __name__ == "__main__":
         "--port",
         help="Desired http port (default: %d)" % default_port,
         default=default_port,
+        required=False,
+    )
+    parser.add_argument(
+        "-s",
+        "--library-path",
+        help="Desired path for library of songs. (default: %s)" % default_lib_dir,
+        default=default_lib_dir,
+        required=False,
+    )
+    parser.add_argument(
+        "-r",
+        "--library-path",
+        help=f"Desired path for the library of songs. (default: {default_library_path})" ,
+        default=default_library_path,
         required=False,
     )
     parser.add_argument(
@@ -776,6 +847,7 @@ if __name__ == "__main__":
     if (args.admin_password):
         admin_password = args.admin_password
 
+    app.jinja_env.globals.update(filename_and_collection_from_path=filename_and_collection_from_path)
     app.jinja_env.globals.update(filename_from_path=filename_from_path)
     app.jinja_env.globals.update(url_escape=quote)
 
@@ -785,8 +857,23 @@ if __name__ == "__main__":
         print("Youtube-dl path not found! " + args.youtubedl_path)
         sys.exit(1)
 
-    # setup/create download directory if necessary
+    # Check file paths
+    lib_path = os.path.expanduser(arg_path_parse(args.library_path))
     dl_path = os.path.expanduser(arg_path_parse(args.download_path))
+
+    if not is_path_in_path(lib_path, dl_path):
+        print("download directory: " + dl_path + " should be a sub directory of the library path: " + lib_path)
+        sys.exit(1)
+
+    # setup/create download directory if necessary
+    if not lib_path.endswith("/"):
+        lib_path += "/"
+    if not os.path.exists(lib_path):
+        print("Creating library path: " + lib_path)
+        os.makedirs(lib_path)
+
+
+    # setup/create download directory if necessary
     if not dl_path.endswith("/"):
         dl_path += "/"
     if not os.path.exists(dl_path):
@@ -804,6 +891,7 @@ if __name__ == "__main__":
     k = karaoke.Karaoke(
         port=args.port,
         ffmpeg_port=args.ffmpeg_port,
+        library_path=lib_path,
         download_path=dl_path,
         youtubedl_path=arg_path_parse(args.youtubedl_path),
         splash_delay=args.splash_delay,

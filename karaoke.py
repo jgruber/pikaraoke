@@ -6,7 +6,7 @@ import random
 import socket
 import subprocess
 import time
-from pathlib import Path
+from pathlib import Path, PurePath
 from queue import Empty, Queue
 from subprocess import CalledProcessError, check_output
 from threading import Thread
@@ -62,6 +62,7 @@ class Karaoke:
         self,
         port=5555,
         ffmpeg_port=5556,
+        library_path="/usr/lib/pikaraoke/songs",
         download_path="/usr/lib/pikaraoke/songs",
         hide_url=False,
         hide_raspiwifi_instructions=False,
@@ -84,6 +85,7 @@ class Karaoke:
         self.hide_url = hide_url
         self.hide_raspiwifi_instructions = hide_raspiwifi_instructions
         self.hide_splash_screen = hide_splash_screen
+        self.library_path = library_path
         self.download_path = download_path
         self.high_quality = high_quality
         self.splash_delay = int(splash_delay)
@@ -117,6 +119,7 @@ class Karaoke:
     splash_delay: {self.splash_delay}
     screensaver_timeout: {self.screensaver_timeout}
     high quality video: {self.high_quality}
+    library path: {self.library_path}
     download path: {self.download_path}
     default volume: {self.volume}
     youtube-dl path: {self.youtubedl_path}
@@ -299,11 +302,11 @@ class Karaoke:
         return rc
 
     def get_available_songs(self):
-        logging.info("Fetching available songs in: " + self.download_path)
+        logging.info("Fetching available songs in: " + self.library_path)
         types = ['.mp4', '.mp3', '.zip', '.mkv', '.avi', '.webm', '.mov']
         files_grabbed = []
-        P=Path(self.download_path)
-        for file in P.rglob('*.*'):
+        P=Path(self.library_path)
+        for file in P.rglob('*/**/*.*'):
             base, ext = os.path.splitext(file.as_posix())
             if ext.lower() in types:
                 if os.path.isfile(file.as_posix()):
@@ -333,7 +336,8 @@ class Karaoke:
         # if we have an associated cdg file, rename that too
         cdg_file = song_path.replace(ext[1],".cdg")
         if (os.path.exists(cdg_file)):
-            os.rename(cdg_file, self.download_path + new_name + ".cdg")
+            new_cdg_file = new_name.replace(ext[1],".cdg")
+            os.rename(cdg_file, new_cdg_file)
         self.get_available_songs()
 
     def filename_from_path(self, file_path):
@@ -341,6 +345,15 @@ class Karaoke:
         rc = os.path.splitext(rc)[0]
         rc = rc.split("---")[0]  # removes youtube id if present
         return rc
+
+    def filename_and_collection_from_path(self, file_path):
+        path = PurePath(file_path)
+        rc = path.stem.split("---")[0]  # removes youtube id if present
+        collection = path.parent.name
+        song_type = "video"
+        if path.suffix == '.mp3':
+            song_type = 'cdg'
+        return "%s - %s - %s" % (rc, collection, song_type)
 
     def find_song_by_youtube_id(self, youtube_id):
         for each in self.available_songs:
