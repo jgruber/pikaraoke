@@ -76,6 +76,7 @@ class Karaoke:
         hide_overlay=False,
         screensaver_timeout = 300,
         url=None,
+        streamurl=None,
         prefer_hostname=True
     ):
 
@@ -95,6 +96,7 @@ class Karaoke:
         self.hide_overlay = hide_overlay
         self.screensaver_timeout = screensaver_timeout
         self.url_override = url
+        self.streamurl_override = streamurl
         self.prefer_hostname = prefer_hostname
 
         # other initializations
@@ -114,6 +116,7 @@ class Karaoke:
     hide URL: {self.hide_url}
     prefer hostname: {self.prefer_hostname}
     url override: {self.url_override}
+    stream url override: {self.streamurl_override}
     hide RaspiWiFi instructions: {self.hide_raspiwifi_instructions}
     headless (hide splash): {self.hide_splash_screen}
     splash_delay: {self.splash_delay}
@@ -154,6 +157,16 @@ class Karaoke:
             else:
                 self.url = f"http://{self.ip}:{self.port}" 
         self.url_parsed = urlparse(self.url)
+        if self.streamurl_override != None:
+            logging.debug("Overriding Stream URL with " + self.streamurl_override)
+            self.streamurl = self.streamurl_override
+            self.streamurl_parsed = urlparse(self.streamurl)
+        else:
+            if (self.prefer_hostname):
+                self.streamurl = f"http://{socket.getfqdn().lower()}:{(self.ffmpeg_port)}"
+            else:
+                self.streamurl = f"http://{self.ip}:{(self.ffmpeg_port)}" 
+            self.streamurl_parsed = urlparse(self.streamurl)
 
         # get songs from download_path
         self.get_available_songs()
@@ -289,9 +302,18 @@ class Karaoke:
             rc = subprocess.call(cmd)  # retry once. Seems like this can be flaky
         if rc == 0:
             logging.debug("Song successfully downloaded: " + video_url)
-            self.get_available_songs()
+            # don't rebuild all songs, just add the newly downloaded song
+            # 1) get the youtube id which should be in the file nanme
+            y = self.get_youtube_id_from_url(video_url)
+            # 2) interate through ONLY the downloads directory for the file name
+            file = self.get_download_file_by_youtube_id(y)
+            # 3) add only that file name to the existing available songs catalog
+            if file:
+                logging.error("unable to find downloaded file by youtube id:" + y)
+                self.add_to_available_songs(file)
+            # self.get_available_songs()
             if enqueue:
-                y = self.get_youtube_id_from_url(video_url)
+                # only enqueue if it made it into available songs
                 s = self.find_song_by_youtube_id(y)
                 if s:
                     self.enqueue(s, user)
@@ -300,6 +322,24 @@ class Karaoke:
         else:
             logging.error("Error downloading song: " + video_url)
         return rc
+
+    def get_download_file_by_youtube_id(self, youtube_id):
+        P=Path(self.download_path)
+        for file in P.rglob('*.*'):
+            if os.path.isfile(file.as_posix()):
+                if youtube_id in file.as_posix():
+                    return file.as_posix()
+
+    def add_to_available_songs(self, song_path):
+        types = ['.mp4', '.mp3', '.zip', '.mkv', '.avi', '.webm', '.mov']
+        P=Path(song_path)
+        files_grabbed = self.available_songs.copy()
+        base, ext = os.path.splitext(P.as_posix())
+        if ext.lower() in types:
+            if os.path.isfile(P.as_posix()):
+                logging.info("adding song: " + P.name)
+                files_grabbed.append(P.as_posix())
+        self.available_songs = sorted(files_grabbed, key=lambda f: str.lower(os.path.basename(f)))
 
     def get_available_songs(self):
         logging.info("Fetching available songs in: " + self.library_path)
@@ -376,9 +416,7 @@ class Karaoke:
         stream_url = f"{self.url_parsed.scheme}://{self.url_parsed.hostname}:{self.ffmpeg_port}/{stream_uid}"
         # pass a 0.0.0.0 IP to ffmpeg which will work for both hostnames and direct IP access
         ffmpeg_url = f"http://0.0.0.0:{self.ffmpeg_port}/{stream_uid}"
-
         pitch = 2**(semitones/12) #The pitch value is (2^x/12), where x represents the number of semitones
-
         try:
             fr = FileResolver(file_path)
         except Exception as e:
@@ -444,6 +482,8 @@ class Karaoke:
                     self.now_playing_filename = file_path
                     self.now_playing_transpose = semitones
                     self.now_playing_url = stream_url
+                    if self.streamurl_override != None:
+                        self.now_playing_url = f"{self.streamurl_override}/{stream_uid}"
                     self.now_playing_user=self.queue[0]["user"]
                     self.is_paused = False
                     self.queue.pop(0)

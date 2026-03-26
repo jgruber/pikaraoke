@@ -820,6 +820,12 @@ if __name__ == "__main__":
         required=False,
     ),
     parser.add_argument(
+        '--streamurl',
+        help="Override the stream url. This argument should include the port, if necessary.",
+        default=None,
+        required=False,
+    ),
+    parser.add_argument(
         "--hide-overlay",
         action="store_true",
         help="Hide overlay that shows on top of video with pikaraoke QR code and IP",
@@ -895,6 +901,7 @@ if __name__ == "__main__":
         hide_overlay=args.hide_overlay,
         screensaver_timeout=args.screensaver_timeout,
         url=args.url,
+        streamurl=args.streamurl,
         prefer_hostname=args.prefer_hostname
     )
 

@@ -1,6 +1,6 @@
 CherryPy
 Flask==2.2.5
-qrcode
+qrcode[pil]
 psutil 
 unidecode
 requests
